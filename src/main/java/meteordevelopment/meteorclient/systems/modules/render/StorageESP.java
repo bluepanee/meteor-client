@@ -10,6 +10,7 @@ import meteordevelopment.meteorclient.renderer.*;
 import meteordevelopment.meteorclient.settings.*;
 import meteordevelopment.meteorclient.systems.modules.Categories;
 import meteordevelopment.meteorclient.systems.modules.Module;
+import meteordevelopment.meteorclient.systems.modules.combat.Burrow;
 import meteordevelopment.meteorclient.utils.Utils;
 import meteordevelopment.meteorclient.utils.render.EntityShaders;
 import meteordevelopment.meteorclient.utils.render.MeshVertexConsumerProvider;
@@ -17,15 +18,19 @@ import meteordevelopment.meteorclient.utils.render.RenderUtils;
 import meteordevelopment.meteorclient.utils.render.SimpleBlockRenderer;
 import meteordevelopment.meteorclient.utils.render.color.Color;
 import meteordevelopment.meteorclient.utils.render.color.SettingColor;
+import meteordevelopment.meteorclient.utils.world.BlockEntityIterator;
 import meteordevelopment.meteorclient.utils.world.Dir;
 import meteordevelopment.orbit.EventHandler;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.ChestBlock;
 import net.minecraft.block.entity.*;
 import net.minecraft.block.enums.ChestType;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
+import java.util.Optional;
 
 public class StorageESP extends Module {
     private final SettingGroup sgGeneral = settings.getDefaultGroup();
@@ -50,6 +55,14 @@ public class StorageESP extends Module {
             .defaultValue(false)
             .build()
     );
+
+    public final Setting<Boolean> skipDungeonChest = sgGeneral.add(new BoolSetting.Builder()
+        .name("skip-dungeon-chests")
+        .description("Dungeon chests will not be rendered.")
+        .defaultValue(false)
+        .build()
+    );
+
 
     private final Setting<ShapeMode> shapeMode = sgGeneral.add(new EnumSetting.Builder<ShapeMode>()
             .name("shape-mode")
@@ -165,6 +178,16 @@ public class StorageESP extends Module {
         }
     }
 
+    private boolean isChestInDungeon(BlockEntity blockEntiy) {
+        Iterable<BlockPos> iter = BlockPos.iterateOutwards(blockEntiy.getPos(), 4, 0, 4);
+        for (BlockPos i : iter) {
+            BlockEntity iterBlockState = mc.world.getBlockEntity(i);
+            if (iterBlockState != null && iterBlockState.getType() == BlockEntityType.MOB_SPAWNER)
+                return true;
+        }
+        return false;
+    }
+
     @EventHandler
     private void onRender(Render3DEvent event) {
         count = 0;
@@ -175,6 +198,9 @@ public class StorageESP extends Module {
             getBlockEntityColor(blockEntity);
 
             if (render) {
+                if (skipDungeonChest.get() && blockEntity instanceof ChestBlockEntity && isChestInDungeon(blockEntity))
+                    continue;
+
                 double dist = mc.player.squaredDistanceTo(blockEntity.getPos().getX() + 0.5, blockEntity.getPos().getY() + 0.5, blockEntity.getPos().getZ() + 0.5);
                 double a = 1;
                 if (dist <= fadeDistance.get() * fadeDistance.get()) a = dist / (fadeDistance.get() * fadeDistance.get());
